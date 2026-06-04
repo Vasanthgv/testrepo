@@ -17,13 +17,13 @@ pipeline {
 
         stage('Build Spring Boot App') {
             steps {
-                bat 'mvn clean package'
+                sh 'mvn clean package'
             }
         }
 
         stage('Build Docker Image') {
             steps {
-                bat 'docker build -t %DOCKER_IMAGE%:%BUILD_NUMBER% -t %DOCKER_IMAGE%:latest .'
+                sh 'docker build -t $DOCKER_IMAGE:$BUILD_NUMBER -t $DOCKER_IMAGE:latest .'
             }
         }
 
@@ -34,15 +34,15 @@ pipeline {
                     usernameVariable: 'DOCKER_USERNAME',
                     passwordVariable: 'DOCKER_PASSWORD'
                 )]) {
-                    bat 'echo %DOCKER_PASSWORD% | docker login -u %DOCKER_USERNAME% --password-stdin'
+                    sh 'echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin'
                 }
             }
         }
 
         stage('Push Docker Image') {
             steps {
-                bat 'docker push %DOCKER_IMAGE%:%BUILD_NUMBER%'
-                bat 'docker push %DOCKER_IMAGE%:latest'
+                sh 'docker push $DOCKER_IMAGE:$BUILD_NUMBER'
+                sh 'docker push $DOCKER_IMAGE:latest'
             }
         }
 
@@ -75,7 +75,7 @@ pipeline {
 
     post {
         always {
-            bat 'docker logout'
+            sh 'docker logout || true'
         }
 
         success {
