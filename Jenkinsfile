@@ -46,32 +46,31 @@ pipeline {
             }
         }
 
-stage('Deploy To Ubuntu VM') {
-    steps {
-        withCredentials([usernamePassword(
-            credentialsId: 'ubuntu-password',
-            usernameVariable: 'UBUNTU_USER',
-            passwordVariable: 'UBUNTU_PASSWORD'
-        )]) {
-            script {
-                def remote = [:]
-                remote.name = 'ubuntu-vm'
-                remote.host = env.REMOTE_HOST
-                remote.user = UBUNTU_USER
-                remote.password = UBUNTU_PASSWORD
-                remote.allowAnyHosts = true
+        stage('Deploy To Ubuntu VM') {
+            steps {
+                withCredentials([usernamePassword(
+                    credentialsId: 'ubuntu-password',
+                    usernameVariable: 'UBUNTU_USER',
+                    passwordVariable: 'UBUNTU_PASSWORD'
+                )]) {
+                    script {
+                        def remote = [:]
+                        remote.name = 'ubuntu-vm'
+                        remote.host = env.REMOTE_HOST
+                        remote.user = UBUNTU_USER
+                        remote.password = UBUNTU_PASSWORD
+                        remote.allowAnyHosts = true
 
-                sshCommand remote: remote, command: """
-                    docker pull ${DOCKER_IMAGE}:latest
-                    docker stop ${CONTAINER_NAME} || true
-                    docker rm ${CONTAINER_NAME} || true
-                    docker run -d --name ${CONTAINER_NAME} -p ${APP_PORT}:8080 --restart unless-stopped ${DOCKER_IMAGE}:latest
-                """
+                        sshCommand remote: remote, command: """
+                            docker pull ${env.DOCKER_IMAGE}:latest
+                            docker stop ${env.CONTAINER_NAME} || true
+                            docker rm ${env.CONTAINER_NAME} || true
+                            docker run -d --name ${env.CONTAINER_NAME} -p ${env.APP_PORT}:8080 --restart unless-stopped ${env.DOCKER_IMAGE}:latest
+                        """
+                    }
+                }
             }
         }
-    }
- }
-}
     }
 
     post {
