@@ -46,7 +46,7 @@ pipeline {
             }
         }
 
-       stage('Deploy To Ubuntu VM') {
+stage('Deploy To Ubuntu VM') {
     steps {
         withCredentials([usernamePassword(
             credentialsId: 'ubuntu-password',
@@ -70,7 +70,9 @@ pipeline {
             }
         }
     }
+ }
 }
+    }
 
     post {
         always {
