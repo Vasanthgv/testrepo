@@ -1,61 +1,88 @@
 pipeline {
-
     agent any
 
     environment {
-        IMAGE_NAME = "yourdockerhub/springboot-demo"
+        DOCKER_IMAGE = 'vasanth97/test'
+        CONTAINER_NAME = 'springboot-demo'
+        REMOTE_HOST = '192.168.0.106'
+        APP_PORT = '8080'
     }
 
     stages {
-
         stage('Checkout') {
             steps {
-                git branch: 'main',
-                url: 'https://github.com/yourrepo.git'
+                checkout scm
             }
         }
 
-        stage('Build') {
+        stage('Build Spring Boot App') {
             steps {
                 bat 'mvn clean package'
             }
         }
 
-        stage('Docker Build') {
+        stage('Build Docker Image') {
             steps {
-                bat 'docker build -t %IMAGE_NAME%:latest .'
+                bat 'docker build -t %DOCKER_IMAGE%:%BUILD_NUMBER% -t %DOCKER_IMAGE%:latest .'
             }
         }
 
-        stage('Docker Push') {
+        stage('Login To Docker Hub') {
             steps {
-                withCredentials([
-                    usernamePassword(
-                        credentialsId: 'dockerhub',
-                        usernameVariable: 'USER',
-                        passwordVariable: 'PASS'
-                    )
-                ]) {
-
-                    bat '''
-                    docker login -u %USER% -p %PASS%
-                    docker push %IMAGE_NAME%:latest
-                    '''
+                withCredentials([usernamePassword(
+                    credentialsId: 'dockerhub-creds',
+                    usernameVariable: 'DOCKER_USERNAME',
+                    passwordVariable: 'DOCKER_PASSWORD'
+                )]) {
+                    bat 'echo %DOCKER_PASSWORD% | docker login -u %DOCKER_USERNAME% --password-stdin'
                 }
             }
         }
 
-        stage('Deploy') {
+        stage('Push Docker Image') {
             steps {
-
-                bat '''
-                ssh vasanth@192.168.1.120 ^
-                "docker pull yourdockerhub/springboot-demo:latest && ^
-                docker stop springboot-demo || true && ^
-                docker rm springboot-demo || true && ^
-                docker run -d --name springboot-demo -p 8080:8080 yourdockerhub/springboot-demo:latest"
-                '''
+                bat 'docker push %DOCKER_IMAGE%:%BUILD_NUMBER%'
+                bat 'docker push %DOCKER_IMAGE%:latest'
             }
+        }
+
+       stage('Deploy To Ubuntu VM') {
+    steps {
+        withCredentials([usernamePassword(
+            credentialsId: 'ubuntu-password',
+            usernameVariable: 'UBUNTU_USER',
+            passwordVariable: 'UBUNTU_PASSWORD'
+        )]) {
+            script {
+                def remote = [:]
+                remote.name = 'ubuntu-vm'
+                remote.host = env.REMOTE_HOST
+                remote.user = UBUNTU_USER
+                remote.password = UBUNTU_PASSWORD
+                remote.allowAnyHosts = true
+
+                sshCommand remote: remote, command: """
+                    docker pull ${DOCKER_IMAGE}:latest
+                    docker stop ${CONTAINER_NAME} || true
+                    docker rm ${CONTAINER_NAME} || true
+                    docker run -d --name ${CONTAINER_NAME} -p ${APP_PORT}:8080 --restart unless-stopped ${DOCKER_IMAGE}:latest
+                """
+            }
+        }
+    }
+}
+
+    post {
+        always {
+            bat 'docker logout'
+        }
+
+        success {
+            echo 'Deployment completed successfully.'
+        }
+
+        failure {
+            echo 'Pipeline failed. Check Jenkins console output.'
         }
     }
 }
